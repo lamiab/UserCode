@@ -7,7 +7,7 @@ process = cms.Process("HIZ")
 options = VarParsing.VarParsing ('analysis')
 
 # setup any defaults you want
-options.outputFile = "Zmumu_Tree_RegitData_147mub.root"
+options.outputFile = "Zmumu_Tree_RegitData.root"
 import os,commands
 def getDirectoryList(path):
     cmd  = 'ls %s/ ' % (path)

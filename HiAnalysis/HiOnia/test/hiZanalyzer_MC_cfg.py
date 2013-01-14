@@ -7,7 +7,7 @@ process = cms.Process("HIZ")
 options = VarParsing.VarParsing ('analysis')
 
 #setup any defaults you want
-options.outputFile = "bjet_Tree_RegitMC.root"
+options.outputFile = "Zmumu_Tree_RegitMC.root"
 #import os,commands
 #def getDirectoryList(path):
 #    cmd  = 'ls %s/ ' % (path)
@@ -28,7 +28,7 @@ process.MessageLogger.destinations = ['cout', 'cerr']
 process.MessageLogger.cerr.FwkReport.reportEvery = 1
 
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
-process.GlobalTag.globaltag = 'STARTHI44_V7::All'
+process.GlobalTag.globaltag = 'STARTHI44_V12::All'
 
 from CmsHi.Analysis2010.CommonFunctions_cff import *
 overrideCentrality(process)
