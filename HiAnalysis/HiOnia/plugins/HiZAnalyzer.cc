@@ -789,33 +789,21 @@ HiZAnalyzer::selGlobalMuon(const pat::Muon* aMuon) {
     return true;
 
   reco::TrackRef iTrack = aMuon->innerTrack();
-  //const reco::HitPattern& p = iTrack->hitPattern();
+  const reco::HitPattern& p = iTrack->hitPattern();
 
   reco::TrackRef gTrack = aMuon->globalTrack();
   const reco::HitPattern& q = gTrack->hitPattern();
 
-  // Z analysis cuts
+  // Z analysis cuts as of December 2012
   return (isMuonInAccept(aMuon) &&
 	  aMuon->isTrackerMuon() &&
-	  iTrack->found() > 10 &&
-	  gTrack->chi2()/gTrack->ndof() < 10.0 &&
 	  q.numberOfValidMuonHits() > 0 &&
-	  iTrack->chi2()/iTrack->ndof() < 4.0 &&
-	  iTrack->ptError()/iTrack->pt() <= 0.1 &&
-	  fabs(iTrack->dxy(RefVtx)) < 0.03 &&
-	  fabs(iTrack->dz(RefVtx)) < 0.150 );
-
-  // J/psi tuned as of 2011-03-18
-  /*return (isMuonInAccept(aMuon) &&
-	  iTrack->found() > 10 &&
-	  gTrack->chi2()/gTrack->ndof() < 20.0 &&
-	  //	  q.numberOfValidMuonHits() > 6 &&
-	  iTrack->chi2()/iTrack->ndof() < 4.0 &&
- 	  aMuon->muonID("TrackerMuonArbitrated") &&
-	  // 	  aMuon->muonID("TMLastStationAngTight") &&
+	  aMuon->numberOfMatchedStations() > 1 &&
+	  q.trackerLayersWithMeasurement() > 4 &&
 	  p.pixelLayersWithMeasurement() > 0 &&
-	  fabs(iTrack->dxy(RefVtx)) < 3.0 &&
-	  fabs(iTrack->dz(RefVtx)) < 15.0 );*/
+	  gTrack->chi2()/gTrack->ndof() < 10.0 &&
+	  fabs(iTrack->dxy(RefVtx)) < 0.02 &&
+	  fabs(iTrack->dz(RefVtx)) < 0.5 );
 }
 
 
