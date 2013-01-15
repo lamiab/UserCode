@@ -78,7 +78,7 @@ private:
   void fillGenInfo();
   int getParentId(const reco::GenParticle* p);
 
-  void fillRecoMuons(int theCentralityBin);
+  void fillRecoMuons();
   bool isMuonInAccept(const pat::Muon* aMuon);
 
   bool selGlobalMuon(const pat::Muon* aMuon);
@@ -86,8 +86,6 @@ private:
   bool selStaMuon(const pat::Muon* aMuon);
 
   void fillRecoHistos(int lastSign);
-  void fillRecoJpsi(int iSign, int count, std::string trigName, std::string centName);
-  void fillHistosAndDS(unsigned int theCat, const pat::CompositeCandidate* aJpsiCand);
 
   void fillTreeMuon(const pat::Muon* muon, int iType, int trigBits);
   void fillTreeJpsi(int iSign, int count);
@@ -98,14 +96,12 @@ private:
   // ----------member data ---------------------------
   enum StatBins {
     BIN_nEvents = 0,
-    BIN_HLT_HIL1DoubleMu0_HighQ = 1,
-    BIN_HLT_HIL2DoubleMu3 = 2,
-    BIN_HLT_HIL3DoubleMuOpen = 3,
-    BIN_HLT_HIL3DoubleMuOpen_Mgt2_OS_NoCowboy = 4,
-    BIN_HLT_HIL2Mu3_NHitQ = 5,
-    BIN_HLT_HIL2Mu7 = 6,
-    BIN_HLT_HIL2Mu15 = 7,
-    BIN_HLT_HIL3Mu3 = 8
+    BIN_HLT_PAL1DoubleMuOpen = 1,
+    BIN_HLT_PAL1DoubleMu0_HighQ = 2,
+    BIN_HLT_PAL2DoubleMu3 = 3,
+    BIN_HLT_PAMu3 = 4,
+    BIN_HLT_PAMu7 = 5,
+    BIN_HLT_PAMu12 = 6
   };
 
   enum dimuonCategories {
@@ -169,6 +165,7 @@ private:
   int Reco_QQ_mupl_StationsMatched[100]; //Muon segments in n muon stations. This implies that the muon is also an arbitrated tracker muon.
   int Reco_QQ_mupl_TrackerHits[100]; //Number of Inner Tracker hits
   int Reco_QQ_mupl_TrackerLayers[100]; //Number of Tracker layers with measurement
+  int Reco_QQ_mupl_PixelHits[100]; //Number of valid pixel hits
   int Reco_QQ_mupl_PixelLayers[100]; //Number of Pixel layers with measurement
   float Reco_QQ_mupl_GlobalChi2[100]; //Global Track fit chi2
   float Reco_QQ_mupl_InnerTrackChi2[100]; //Inner Track fit chi2
@@ -181,6 +178,7 @@ private:
   int Reco_QQ_mumi_StationsMatched[100];
   int Reco_QQ_mumi_TrackerHits[100];
   int Reco_QQ_mumi_TrackerLayers[100];
+  int Reco_QQ_mumi_PixelHits[100];
   int Reco_QQ_mumi_PixelLayers[100];
   float Reco_QQ_mumi_GlobalChi2[100];
   float Reco_QQ_mumi_InnerTrackChi2[100];
@@ -197,6 +195,7 @@ private:
   int Reco_mu_StationsMatched[100];
   int Reco_mu_TrackerHits[100];
   int Reco_mu_TrackerLayers[100];
+  int Reco_mu_PixelHits[100];
   int Reco_mu_PixelLayers[100];
   float Reco_mu_GlobalChi2[100];
   float Reco_mu_InnerTrackChi2[100];
@@ -246,7 +245,6 @@ private:
   std::vector<double> _centralityranges;
   bool           _applycuts;
   bool           _useBS;
-  bool           _useRapidity;
   bool           _removeSignal;
   bool           _removeMuons;
   bool           _storeSs;
@@ -306,7 +304,6 @@ HiZAnalyzer::HiZAnalyzer(const edm::ParameterSet& iConfig):
   _centralityranges(iConfig.getParameter< std::vector<double> >("centralityRanges")),			
   _applycuts(iConfig.getParameter<bool>("applyCuts")),	
   _useBS(iConfig.getParameter<bool>("useBeamSpot")),
-  _useRapidity(iConfig.getParameter<bool>("useRapidity")),
   _removeSignal(iConfig.getUntrackedParameter<bool>("removeSignalEvents",false)),
   _removeMuons(iConfig.getUntrackedParameter<bool>("removeTrueMuons",false)),
   _storeSs(iConfig.getUntrackedParameter<bool>("storeSameSign",false)), 
@@ -321,10 +318,11 @@ HiZAnalyzer::HiZAnalyzer(const edm::ParameterSet& iConfig):
 {
    //now do what ever initialization is needed
   nEvents = 0;
-  centrality_ = 0;
+  if (_isHI) {
+   centrality_ = 0;
 
-  std::stringstream centLabel;
-  for (unsigned int iCent=0; iCent<_centralityranges.size(); ++iCent) {
+   std::stringstream centLabel;
+   for (unsigned int iCent=0; iCent<_centralityranges.size(); ++iCent) {
     if (iCent==0)
       centLabel << "00" << _centralityranges.at(iCent);
     else
@@ -332,8 +330,9 @@ HiZAnalyzer::HiZAnalyzer(const edm::ParameterSet& iConfig):
 
     theCentralities.push_back(centLabel.str());
     centLabel.str("");
+   }
+   theCentralities.push_back("MinBias");
   }
-  theCentralities.push_back("MinBias");
 
   theSign.push_back("pm");
   if (_storeSs) {
@@ -347,24 +346,20 @@ HiZAnalyzer::HiZAnalyzer(const edm::ParameterSet& iConfig):
   }
 
   HLTLastFilters[0] = "";
-  HLTLastFilters[1] = "hltHIDoubleMuLevel1PathL1HighQFiltered"; // BIT HLT_HIL1DoubleMu0_HighQ
-  HLTLastFilters[2] = "hltHIL2DoubleMu3L2Filtered";             // BIT HLT_HIL2DoubleMu3
-  HLTLastFilters[3] = "hltHIDimuonL3FilteredOpen";              // BIT HLT_HIL3DoubleMuOpen
-  HLTLastFilters[4] = "hltHIDimuonL3FilteredMg2OSnoCowboy";    // BIT HLT_HIL3DoubleMuOpen_Mgt2_OS_NoCowboy
-  HLTLastFilters[5] = "hltHIL2Mu3NHitL2Filtered";               // BIT HLT_HIL2Mu3_NHitQ
-  HLTLastFilters[6] = "hltHIL2Mu7L2Filtered";                   // BIT HLT_HIL2Mu7
-  HLTLastFilters[7] = "hltHIL2Mu15L2Filtered";                  // BIT HLT_HIL2Mu15
-  HLTLastFilters[8] = "hltHISingleMu3L3Filtered";               // BIT HLT_HIL3Mu3
+  HLTLastFilters[1] = "hltL1fL1sPAL1DoubleMuOpenL1Filtered0";		// BIT HLT_PAL1DoubleMuOpen
+  HLTLastFilters[2] = "hltL1fL1sPAL1DoubleMu0HighQL1FilteredHighQ";	// BIT HLT_PAL1DoubleMu0_HighQ
+  HLTLastFilters[3] = "hltL2fL1sPAL2DoubleMu3L2Filtered3";		// BIT HLT_PAL2DoubleMu3
+  HLTLastFilters[4] = "hltL3fL2sMu3L3Filtered3";		// BIT HLT_PAMu3
+  HLTLastFilters[5] = "hltL3fL2sMu7L3Filtered7";		// BIT HLT_PAMu7
+  HLTLastFilters[6] = "hltL3fL2sMu12L3Filtered12";		// BIT HLT_PAMu12
 
   theTriggerNames.push_back("NoTrigger");
-  theTriggerNames.push_back("HLT_HIL1DoubleMu0_HighQ");
-  theTriggerNames.push_back("HLT_HIL2DoubleMu3");
-  theTriggerNames.push_back("HLT_HIL3DoubleMuOpen");
-  theTriggerNames.push_back("HLT_HIL3DoubleMuOpen_Mgt2_OS_NoCowboy");
-  theTriggerNames.push_back("HLT_HIL2Mu3_NHitQ");
-  theTriggerNames.push_back("HLT_HIL2Mu7");
-  theTriggerNames.push_back("HLT_HIL2Mu15");
-  theTriggerNames.push_back("HLT_HIL3Mu3");
+  theTriggerNames.push_back("HLT_PAL1DoubleMuOpen");
+  theTriggerNames.push_back("HLT_PAL1DoubleMu0_HighQ");
+  theTriggerNames.push_back("HLT_PAL2DoubleMu3");
+  theTriggerNames.push_back("HLT_PAMu3");
+  theTriggerNames.push_back("HLT_PAMu7");
+  theTriggerNames.push_back("HLT_PAMu12");
 
   etaMax = 2.4;  
 }
@@ -418,15 +413,17 @@ HiZAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
   if (fabs(zVtx) > _iConfig.getParameter< double > ("maxAbsZ")) return;
   hPileUp->Fill(nPV);
 
-  if(!centrality_) centrality_ = new CentralityProvider(iSetup);
-  centrality_->newEvent(iEvent,iSetup); // make sure you do this first in every event
-  centBin = centrality_->getBin();
-  hCent->Fill(centBin);
+  if(_isHI) {
+    if(!centrality_) centrality_ = new CentralityProvider(iSetup);
+    centrality_->newEvent(iEvent,iSetup); // make sure you do this first in every event
+    centBin = centrality_->getBin();
+    hCent->Fill(centBin);
 
-  for (unsigned int iCent=0; iCent<_centralityranges.size(); ++iCent) {
-    if (centBin<_centralityranges.at(iCent)/2.5) {
-      theCentralityBin=iCent;
-      break;
+    for (unsigned int iCent=0; iCent<_centralityranges.size(); ++iCent) {
+     if (centBin<_centralityranges.at(iCent)) {
+       theCentralityBin=iCent;
+       break;
+     }
     }
   }
 
@@ -449,7 +446,7 @@ HiZAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
   }
 
   if (_fillSingleMuons)
-    fillRecoMuons(theCentralityBin);
+    fillRecoMuons();
 
   fillRecoHistos(lastSign);
 
@@ -496,6 +493,7 @@ HiZAnalyzer::fillTreeMuon(const pat::Muon* muon, int iType, int trigBits) {
   Reco_mu_StationsMatched[Reco_mu_size] = muon->numberOfMatchedStations();
   Reco_mu_TrackerHits[Reco_mu_size] = muon->innerTrack()->found();
   Reco_mu_TrackerLayers[Reco_mu_size] = muon->globalTrack()->hitPattern().trackerLayersWithMeasurement();
+  Reco_mu_PixelHits[Reco_mu_size] = muon->innerTrack()->hitPattern().numberOfValidPixelHits();
   Reco_mu_PixelLayers[Reco_mu_size] = muon->innerTrack()->hitPattern().pixelLayersWithMeasurement();
   Reco_mu_GlobalChi2[Reco_mu_size] = muon->globalTrack()->chi2()/muon->globalTrack()->ndof();
   Reco_mu_InnerTrackChi2[Reco_mu_size] = muon->innerTrack()->chi2()/muon->innerTrack()->ndof();
@@ -544,6 +542,8 @@ HiZAnalyzer::fillTreeJpsi(int iSign, int count) {
   int trackerhits2 = -1;
   int trackerlayers1 = -1;
   int trackerlayers2 = -1;
+  int pixelhits1 = -1;
+  int pixelhits2 = -1;
   int pixellayers1 = -1;
   int pixellayers2 = -1;
   float glbchi1 = -1;
@@ -557,30 +557,30 @@ HiZAnalyzer::fillTreeJpsi(int iSign, int count) {
   float pterr1 = -1;
   float pterr2 = -1;
 
-  if (Reco_QQ_type[Reco_QQ_size] == GlbGlb) {
-  	istrackermu1 = muon1->isTrackerMuon();
-  	istrackermu2 = muon2->isTrackerMuon();
-  	muvalidhits1 = muon1->globalTrack()->hitPattern().numberOfValidMuonHits();
-  	muvalidhits2 = muon2->globalTrack()->hitPattern().numberOfValidMuonHits();
-	stationsmatched1 = muon1->numberOfMatchedStations();
-	stationsmatched2 = muon2->numberOfMatchedStations();
-  	trackerhits1 = muon1->innerTrack()->found();
-  	trackerhits2 = muon2->innerTrack()->found();
-	trackerlayers1 = muon1->globalTrack()->hitPattern().trackerLayersWithMeasurement();
-	trackerlayers2 = muon2->globalTrack()->hitPattern().trackerLayersWithMeasurement();
-	pixellayers1 = muon1->innerTrack()->hitPattern().pixelLayersWithMeasurement();
-	pixellayers2 = muon2->innerTrack()->hitPattern().pixelLayersWithMeasurement();
-  	glbchi1 = muon1->globalTrack()->chi2()/muon1->globalTrack()->ndof();
-  	glbchi2 = muon2->globalTrack()->chi2()/muon2->globalTrack()->ndof();
-  	innchi1 = muon1->innerTrack()->chi2()/muon1->innerTrack()->ndof();
-  	innchi2 = muon2->innerTrack()->chi2()/muon2->innerTrack()->ndof();
-  	dz1 = muon1->innerTrack()->dz(RefVtx);
-  	dz2 = muon2->innerTrack()->dz(RefVtx);
-  	dxy1 = muon1->innerTrack()->dxy(RefVtx);
-  	dxy2 = muon2->innerTrack()->dxy(RefVtx);
-  	pterr1 = muon1->innerTrack()->ptError();
-  	pterr2 = muon2->innerTrack()->ptError();
-  }
+  istrackermu1 = muon1->isTrackerMuon();
+  istrackermu2 = muon2->isTrackerMuon();
+  muvalidhits1 = muon1->globalTrack()->hitPattern().numberOfValidMuonHits();
+  muvalidhits2 = muon2->globalTrack()->hitPattern().numberOfValidMuonHits();
+  stationsmatched1 = muon1->numberOfMatchedStations();
+  stationsmatched2 = muon2->numberOfMatchedStations();
+  trackerhits1 = muon1->innerTrack()->found();
+  trackerhits2 = muon2->innerTrack()->found();
+  trackerlayers1 = muon1->globalTrack()->hitPattern().trackerLayersWithMeasurement();
+  trackerlayers2 = muon2->globalTrack()->hitPattern().trackerLayersWithMeasurement();
+  pixelhits1 = muon1->innerTrack()->hitPattern().numberOfValidPixelHits();
+  pixelhits2 = muon2->innerTrack()->hitPattern().numberOfValidPixelHits();
+  pixellayers1 = muon1->innerTrack()->hitPattern().pixelLayersWithMeasurement();
+  pixellayers2 = muon2->innerTrack()->hitPattern().pixelLayersWithMeasurement();
+  glbchi1 = muon1->globalTrack()->chi2()/muon1->globalTrack()->ndof();
+  glbchi2 = muon2->globalTrack()->chi2()/muon2->globalTrack()->ndof();
+  innchi1 = muon1->innerTrack()->chi2()/muon1->innerTrack()->ndof();
+  innchi2 = muon2->innerTrack()->chi2()/muon2->innerTrack()->ndof();
+  dz1 = muon1->innerTrack()->dz(RefVtx);
+  dz2 = muon2->innerTrack()->dz(RefVtx);
+  dxy1 = muon1->innerTrack()->dxy(RefVtx);
+  dxy2 = muon2->innerTrack()->dxy(RefVtx);
+  pterr1 = muon1->innerTrack()->ptError();
+  pterr2 = muon2->innerTrack()->ptError();
 
   if (muon1->charge() > muon2->charge()) {
     new((*Reco_QQ_mupl_4mom)[Reco_QQ_size])TLorentzVector(vMuon1);
@@ -593,6 +593,8 @@ HiZAnalyzer::fillTreeJpsi(int iSign, int count) {
     Reco_QQ_mumi_TrackerHits[Reco_QQ_size]=trackerhits2;
     Reco_QQ_mupl_TrackerLayers[Reco_QQ_size]=trackerlayers1;
     Reco_QQ_mumi_TrackerLayers[Reco_QQ_size]=trackerlayers2;
+    Reco_QQ_mupl_PixelHits[Reco_QQ_size]=pixelhits1;
+    Reco_QQ_mumi_PixelHits[Reco_QQ_size]=pixelhits2;
     Reco_QQ_mupl_PixelLayers[Reco_QQ_size]=pixellayers1;
     Reco_QQ_mumi_PixelLayers[Reco_QQ_size]=pixellayers2;
     Reco_QQ_mupl_GlobalChi2[Reco_QQ_size]=glbchi1;
@@ -619,6 +621,8 @@ HiZAnalyzer::fillTreeJpsi(int iSign, int count) {
     Reco_QQ_mumi_TrackerHits[Reco_QQ_size]=trackerhits1;
     Reco_QQ_mupl_TrackerLayers[Reco_QQ_size]=trackerlayers2;
     Reco_QQ_mumi_TrackerLayers[Reco_QQ_size]=trackerlayers1;
+    Reco_QQ_mupl_PixelHits[Reco_QQ_size]=pixelhits2;
+    Reco_QQ_mumi_PixelHits[Reco_QQ_size]=pixelhits1;
     Reco_QQ_mupl_PixelLayers[Reco_QQ_size]=pixellayers2;
     Reco_QQ_mumi_PixelLayers[Reco_QQ_size]=pixellayers1;
     Reco_QQ_mupl_GlobalChi2[Reco_QQ_size]=glbchi2;
@@ -668,7 +672,7 @@ HiZAnalyzer::checkTriggers(const pat::CompositeCandidate* aJpsiCand) {
     //   pass2 = mu2HLTMatchesPath.size() > 0;
     // }
 
-    if (iTr > 4) {  // single triggers here
+    if (iTr > 3) {  // single triggers here
       isTriggerMatched[iTr] = pass1 || pass2;
     } else {        // double triggers here
       isTriggerMatched[iTr] = pass1 && pass2;
@@ -715,7 +719,7 @@ HiZAnalyzer::makeCuts(int sign) {
 	  _thePassedCats[sign].push_back(GlbGlb);  _thePassedCands[sign].push_back(cand);
 	  continue;
 	}
-	// for the moment consider only Glb+Glb pairs
+
 	/*
 	// global + tracker? (x2)    
 	if (checkCuts(cand,muon1,muon2,&HiZAnalyzer::selGlobalMuon,&HiZAnalyzer::selTrackerMuon)){
@@ -726,14 +730,13 @@ HiZAnalyzer::makeCuts(int sign) {
 	if (checkCuts(cand,muon2,muon1,&HiZAnalyzer::selGlobalMuon,&HiZAnalyzer::selTrackerMuon)){
 	  _thePassedCats[sign].push_back(GlbTrk);  _thePassedCands[sign].push_back(cand);
 	  continue;
-	}
+	}*/
 
 	// tracker + tracker?  
-	if (checkCuts(cand,muon1,muon2,&HiZAnalyzer::selTrackerMuon,&HiZAnalyzer::selTrackerMuon)){
+	/*if (checkCuts(cand,muon1,muon2,&HiZAnalyzer::selTrackerMuon,&HiZAnalyzer::selTrackerMuon)){
 	  _thePassedCats[sign].push_back(TrkTrk);  _thePassedCands[sign].push_back(cand);
 	  continue;
-	}
-	*/
+	}*/
 
 	// sta + sta? meaning both are only sta (not global, not tracker)
 	/*if (checkCuts(cand,muon1,muon2,&HiZAnalyzer::selStaMuon,&HiZAnalyzer::selStaMuon)){
@@ -762,9 +765,8 @@ HiZAnalyzer::makeCuts(int sign) {
 
 bool
 HiZAnalyzer::checkCuts(const pat::CompositeCandidate* cand, const pat::Muon* muon1,  const pat::Muon* muon2, bool(HiZAnalyzer::* callFunc1)(const pat::Muon*), bool(HiZAnalyzer::* callFunc2)(const pat::Muon*)) {
-  if ( (  (this->*callFunc1)(muon1) &&  (this->*callFunc2)(muon2) ) &&
-       (!_applycuts || cand->userFloat("vProb") > 0.01) )
-  //if ( (this->*callFunc1)(muon1) &&  (this->*callFunc2)(muon2) )
+  //if ( (  (this->*callFunc1)(muon1) &&  (this->*callFunc2)(muon2) ) && (!_applycuts || cand->userFloat("vProb") > 0.01) )
+  if ( (this->*callFunc1)(muon1) &&  (this->*callFunc2)(muon2) )
     return true;
   else
     return false;
@@ -781,9 +783,6 @@ HiZAnalyzer::selGlobalMuon(const pat::Muon* aMuon) {
   
   if(!aMuon->isGlobalMuon())
     return false;
-
-  //if(!aMuon->isTrackerMuon())
-    //return false;
   
   if(!_applycuts)
     return true;
@@ -794,18 +793,34 @@ HiZAnalyzer::selGlobalMuon(const pat::Muon* aMuon) {
   reco::TrackRef gTrack = aMuon->globalTrack();
   const reco::HitPattern& q = gTrack->hitPattern();
 
+<<<<<<< HiZAnalyzer.cc
+  // Tight muon cuts January 2013
+=======
   // Z analysis cuts as of December 2012
+>>>>>>> 1.2
   return (isMuonInAccept(aMuon) &&
+<<<<<<< HiZAnalyzer.cc
+	  gTrack->normalizedChi2() < 10. &&
+=======
 	  aMuon->isTrackerMuon() &&
+>>>>>>> 1.2
 	  q.numberOfValidMuonHits() > 0 &&
+<<<<<<< HiZAnalyzer.cc
+	  aMuon->numberOfMatchedStations() > 1 &&
+	  fabs(iTrack->dxy(RefVtx)) < 0.2 &&
+	  fabs(iTrack->dz(RefVtx)) < 0.5 &&
+ 	  p.numberOfValidPixelHits() > 0 &&
+	  q.trackerLayersWithMeasurement() > 5 );
+
+=======
 	  aMuon->numberOfMatchedStations() > 1 &&
 	  q.trackerLayersWithMeasurement() > 4 &&
 	  p.pixelLayersWithMeasurement() > 0 &&
 	  gTrack->chi2()/gTrack->ndof() < 10.0 &&
 	  fabs(iTrack->dxy(RefVtx)) < 0.02 &&
 	  fabs(iTrack->dz(RefVtx)) < 0.5 );
+>>>>>>> 1.2
 }
-
 
 bool 
 HiZAnalyzer::selTrackerMuon(const pat::Muon* aMuon) { //we don't use this now
@@ -969,7 +984,7 @@ int HiZAnalyzer::getParentId(const reco::GenParticle* p)
 }
 
 void
-HiZAnalyzer::fillRecoMuons(int iCent)
+HiZAnalyzer::fillRecoMuons()
 {
   int nL1DoubleMuOpenMuons=0;
   int nL2DoubleMu3Muons=0;
@@ -995,7 +1010,6 @@ HiZAnalyzer::fillRecoMuons(int iCent)
 
       if (muon->isGlobalMuon() &&
 	  selGlobalMuon(muon)) {
-	std::string theLabel = theTriggerNames.at(0) + "_" + theCentralities.at(iCent);
 	
 	nGoodMuons++;
 
@@ -1006,13 +1020,12 @@ HiZAnalyzer::fillRecoMuons(int iCent)
 
 	  // apparently matching by path gives false positives so we use matching by filter for all triggers for which we know the filter name
 	  if ( muHLTMatchesFilter.size() > 0 ) {
-	    std::string theLabel = theTriggerNames.at(iTr) + "_" + theCentralities.at(iCent);
 
 	    trigBits += pow(2,iTr-1);
 
 	    if (iTr==1) nL1DoubleMuOpenMuons++;
 	    if (iTr==3) nL2DoubleMu3Muons++;
-	    if (iTr==4) nL2Mu20Muons++;
+	    if (iTr==6) nL2Mu20Muons++;
 	  }
 	}
 	if (_fillTree)
@@ -1074,6 +1087,8 @@ HiZAnalyzer::InitTree()
   myTree->Branch("Reco_QQ_mumi_TrackerHits", Reco_QQ_mumi_TrackerHits, "Reco_QQ_mumi_TrackerHits[Reco_QQ_size]/I");
   myTree->Branch("Reco_QQ_mupl_TrackerLayers", Reco_QQ_mupl_TrackerLayers, "Reco_QQ_mupl_TrackerLayers[Reco_QQ_size]/I");
   myTree->Branch("Reco_QQ_mumi_TrackerLayers", Reco_QQ_mumi_TrackerLayers, "Reco_QQ_mumi_TrackerLayers[Reco_QQ_size]/I");
+  myTree->Branch("Reco_QQ_mupl_PixelHits", Reco_QQ_mupl_PixelHits, "Reco_QQ_mupl_PixelHits[Reco_QQ_size]/I");
+  myTree->Branch("Reco_QQ_mumi_PixelHits", Reco_QQ_mumi_PixelHits, "Reco_QQ_mumi_PixelHits[Reco_QQ_size]/I");
   myTree->Branch("Reco_QQ_mupl_PixelLayers", Reco_QQ_mupl_PixelLayers, "Reco_QQ_mupl_PixelLayers[Reco_QQ_size]/I");
   myTree->Branch("Reco_QQ_mumi_PixelLayers", Reco_QQ_mumi_PixelLayers, "Reco_QQ_mumi_PixelLayers[Reco_QQ_size]/I");
   myTree->Branch("Reco_QQ_mupl_GlobalChi2", Reco_QQ_mupl_GlobalChi2, "Reco_QQ_mupl_GlobalChi2[Reco_QQ_size]/F");
@@ -1097,6 +1112,7 @@ HiZAnalyzer::InitTree()
   myTree->Branch("Reco_mu_StationsMatched",Reco_mu_StationsMatched, "Reco_mu_StationsMatched[Reco_mu_size]/I");
   myTree->Branch("Reco_mu_TrackerHits", Reco_mu_TrackerHits, "Reco_mu_TrackerHits[Reco_mu_size]/I");
   myTree->Branch("Reco_mu_TrackerLayers", Reco_mu_TrackerLayers, "Reco_mu_TrackerLayers[Reco_mu_size]/I");
+  myTree->Branch("Reco_mu_PixelHits", Reco_mu_PixelHits, "Reco_mu_PixelHits[Reco_mu_size]/I");
   myTree->Branch("Reco_mu_PixelLayers", Reco_mu_PixelLayers, "Reco_mu_PixelLayers[Reco_mu_size]/I");
   myTree->Branch("Reco_mu_GlobalChi2", Reco_mu_GlobalChi2, "Reco_mu_GlobalChi2[Reco_mu_size]/F");
   myTree->Branch("Reco_mu_InnerTrackChi2", Reco_mu_InnerTrackChi2, "Reco_mu_InnerTrackChi2[Reco_mu_size]/F");
@@ -1147,8 +1163,10 @@ HiZAnalyzer::beginJob()
   }
   hStats->Sumw2();
 
-  hCent = new TH1F("hCent","hCent;centrality bin;Number of Events",40,0,40);
-  hCent->Sumw2();
+  if (_isHI) {
+   hCent = new TH1F("hCent","hCent;centrality bin;Number of Events",100,0,100);
+   hCent->Sumw2();
+  }
 
   hPileUp = new TH1F("hPileUp","Number of Primary Vertices;n_{PV};counts", 50, 0, 50);
   hPileUp->Sumw2();
@@ -1166,7 +1184,7 @@ HiZAnalyzer::endJob() {
 
   fOut->cd();
   hStats->Write();
-  hCent->Write();
+  if (_isHI) hCent->Write();
   hPileUp->Write();
   hZVtx->Write();
 
