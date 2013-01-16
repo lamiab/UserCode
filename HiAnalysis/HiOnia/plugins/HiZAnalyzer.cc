@@ -793,33 +793,15 @@ HiZAnalyzer::selGlobalMuon(const pat::Muon* aMuon) {
   reco::TrackRef gTrack = aMuon->globalTrack();
   const reco::HitPattern& q = gTrack->hitPattern();
 
-<<<<<<< HiZAnalyzer.cc
   // Tight muon cuts January 2013
-=======
-  // Z analysis cuts as of December 2012
->>>>>>> 1.2
   return (isMuonInAccept(aMuon) &&
-<<<<<<< HiZAnalyzer.cc
 	  gTrack->normalizedChi2() < 10. &&
-=======
-	  aMuon->isTrackerMuon() &&
->>>>>>> 1.2
 	  q.numberOfValidMuonHits() > 0 &&
-<<<<<<< HiZAnalyzer.cc
 	  aMuon->numberOfMatchedStations() > 1 &&
 	  fabs(iTrack->dxy(RefVtx)) < 0.2 &&
 	  fabs(iTrack->dz(RefVtx)) < 0.5 &&
  	  p.numberOfValidPixelHits() > 0 &&
 	  q.trackerLayersWithMeasurement() > 5 );
-
-=======
-	  aMuon->numberOfMatchedStations() > 1 &&
-	  q.trackerLayersWithMeasurement() > 4 &&
-	  p.pixelLayersWithMeasurement() > 0 &&
-	  gTrack->chi2()/gTrack->ndof() < 10.0 &&
-	  fabs(iTrack->dxy(RefVtx)) < 0.02 &&
-	  fabs(iTrack->dz(RefVtx)) < 0.5 );
->>>>>>> 1.2
 }
 
 bool 
