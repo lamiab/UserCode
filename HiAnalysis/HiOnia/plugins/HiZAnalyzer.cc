@@ -223,9 +223,11 @@ private:
   TH1F* hZVtx;
 
   // centrality
-  CentralityProvider* centrality_;
+  CentralityProvider* centralityProvider_;
   int centBin;
   int theCentralityBin;
+  int hiNpix, hiNpixelTracks, hiNtracks;
+  float hiHF, hiHFplus, hiHFminus, hiHFplusEta4, hiHFminusEta4, hiEB, hiET, hiEE, hiEEplus, hiEEminus, hiZDC, hiZDCplus, hiZDCminus;
 
   // handles
   edm::Handle<pat::CompositeCandidateCollection> collJpsi;
@@ -241,6 +243,7 @@ private:
   edm::InputTag       _genParticle;
   edm::InputTag       _thePVs;
   std::string         _histfilename;
+  edm::InputTag       _centralitytag;
 
   std::vector<double> _centralityranges;
   bool           _applycuts;
@@ -301,6 +304,7 @@ HiZAnalyzer::HiZAnalyzer(const edm::ParameterSet& iConfig):
   _genParticle(iConfig.getParameter<edm::InputTag>("genParticles")),
   _thePVs(iConfig.getParameter<edm::InputTag>("primaryVertexTag")),
   _histfilename(iConfig.getParameter<std::string>("histFileName")),
+  _centralitytag(iConfig.getParameter<edm::InputTag>("srcCentrality")),
   _centralityranges(iConfig.getParameter< std::vector<double> >("centralityRanges")),			
   _applycuts(iConfig.getParameter<bool>("applyCuts")),	
   _useBS(iConfig.getParameter<bool>("useBeamSpot")),
@@ -319,7 +323,8 @@ HiZAnalyzer::HiZAnalyzer(const edm::ParameterSet& iConfig):
    //now do what ever initialization is needed
   nEvents = 0;
   if (_isHI) {
-   centrality_ = 0;
+
+   centralityProvider_ = 0;
 
    std::stringstream centLabel;
    for (unsigned int iCent=0; iCent<_centralityranges.size(); ++iCent) {
@@ -414,10 +419,30 @@ HiZAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
   hPileUp->Fill(nPV);
 
   if(_isHI) {
-    if(!centrality_) centrality_ = new CentralityProvider(iSetup);
-    centrality_->newEvent(iEvent,iSetup); // make sure you do this first in every event
-    centBin = centrality_->getBin();
+    edm::Handle<reco::Centrality> centrality_;
+    iEvent.getByLabel(_centralitytag,centrality_);
+
+    if(!centralityProvider_) centralityProvider_ = new CentralityProvider(iSetup);
+    centralityProvider_->newEvent(iEvent,iSetup); // make sure you do this first in every event
+    centBin = centralityProvider_->getBin();
     hCent->Fill(centBin);
+
+    hiNpix = centrality_->multiplicityPixel();
+    hiNpixelTracks = centrality_->NpixelTracks();
+    hiNtracks = centrality_->Ntracks();
+    hiHF = centrality_->EtHFtowerSum();
+    hiHFplus = centrality_->EtHFtowerSumPlus();
+    hiHFminus = centrality_->EtHFtowerSumMinus();
+    hiHFplusEta4 = centrality_->EtHFtruncatedPlus();
+    hiHFminusEta4 = centrality_->EtHFtruncatedMinus();
+    hiZDC = centrality_->zdcSum();
+    hiZDCplus = centrality_->zdcSumPlus();
+    hiZDCminus = centrality_->zdcSumMinus();
+    hiEEplus = centrality_->EtEESumPlus();
+    hiEEminus = centrality_->EtEESumMinus();
+    hiEE = centrality_->EtEESum();
+    hiEB = centrality_->EtEBSum();
+    hiET = centrality_->EtMidRapiditySum();
 
     for (unsigned int iCent=0; iCent<_centralityranges.size(); ++iCent) {
      if (centBin<_centralityranges.at(iCent)) {
@@ -1050,6 +1075,23 @@ HiZAnalyzer::InitTree()
   myTree->Branch("zVtx",    &zVtx,        "zVtx/F"); 
   myTree->Branch("HLTriggers", &HLTriggers, "HLTriggers/I");
   myTree->Branch("Centrality", &centBin, "Centrality/I");
+
+  myTree->Branch("hiHF",&hiHF,"hiHF/F");
+  myTree->Branch("hiHFplus",&hiHFplus,"hiHFplus/F");
+  myTree->Branch("hiHFminus",&hiHFminus,"hiHFminus/F");
+  myTree->Branch("hiHFplusEta4",&hiHFplusEta4,"hiHFplusEta4/F");
+  myTree->Branch("hiHFminusEta4",&hiHFminusEta4,"hiHFminusEta4/F");
+  myTree->Branch("hiZDC",&hiZDC,"hiZDC/F");
+  myTree->Branch("hiZDCplus",&hiZDCplus,"hiZDCplus/F");
+  myTree->Branch("hiZDCminus",&hiZDCminus,"hiZDCminus/F");
+  myTree->Branch("hiET",&hiET,"hiET/F");
+  myTree->Branch("hiEE",&hiEE,"hiEE/F");
+  myTree->Branch("hiEB",&hiEB,"hiEB/F");
+  myTree->Branch("hiEEplus",&hiEEplus,"hiEEplus/F");
+  myTree->Branch("hiEEminus",&hiEEminus,"hiEEminus/F");
+  myTree->Branch("hiNpix",&hiNpix,"hiNpix/I");
+  myTree->Branch("hiNpixelTracks",&hiNpixelTracks,"hiNpixelTracks/I");
+  myTree->Branch("hiNtracks",&hiNtracks,"hiNtracks/I");
 
   myTree->Branch("Reco_QQ_size", &Reco_QQ_size,  "Reco_QQ_size/I");
   myTree->Branch("Reco_QQ_type", Reco_QQ_type,   "Reco_QQ_type[Reco_QQ_size]/I");
