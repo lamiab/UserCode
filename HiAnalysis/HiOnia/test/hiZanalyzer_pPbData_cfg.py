@@ -7,7 +7,7 @@ process = cms.Process("HIZ")
 options = VarParsing.VarParsing ('analysis')
 
 # setup any defaults you want
-options.outputFile = "Zmumu_Tree_pPbData_test.root"
+options.outputFile = "Zmumu_Tree_pPbData_Prompt_210658-210737_ntrk.root"
 #import os,commands
 #def getDirectoryList(path):
 #    cmd  = 'ls %s/ ' % (path)
@@ -16,7 +16,8 @@ options.outputFile = "Zmumu_Tree_pPbData_test.root"
 
 #options.inputFiles = getDirectoryList("/afs/cern.ch/work/m/mironov/public/regitSkim147mub/skim")
 
-options.inputFiles = "file:/afs/cern.ch/user/t/tdahms/public/ForAnna/onia2MuMuPAT.root"
+options.inputFiles = "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_10_1_M16.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_11_1_LTK.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_12_1_sPu.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_13_1_rue.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_16_1_hXV.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_17_1_dmi.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_18_1_oO4.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_19_1_kH7.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_1_1_MA9.root",  "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_21_1_WK2.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_22_1_cR1.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_23_1_cEv.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_24_1_xBV.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_25_1_lkq.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_2_1_hSA.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_3_1_WJu.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_4_1_O5Y.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_5_1_PpA.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_6_1_oUv.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_7_1_XHP.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_8_1_Q89.root", "/store/caf/user/tdahms/Data2013/pPb/PromptSkims/Runs_210658-210737/onia2MuMuPAT_9_1_KVk.root"
+
 
 options.maxEvents = -1 # -1 means all events
 
@@ -25,7 +26,7 @@ options.parseArguments()
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.destinations = ['cout', 'cerr']
-process.MessageLogger.cerr.FwkReport.reportEvery = 1
+process.MessageLogger.cerr.FwkReport.reportEvery = 1000
 
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 process.GlobalTag.globaltag ='GR_P_V43D::All' # the same tag that have been used for the skim
@@ -49,12 +50,21 @@ process.source = cms.Source("PoolSource",
     )
 )
 
+process.hltMult100DblMu3 = cms.EDFilter("HLTHighLevel",
+                 TriggerResultsTag = cms.InputTag("TriggerResults","","HLT"),
+                 HLTPaths = cms.vstring("HLT_PAPixelTrackMultiplicity100_L2DoubleMu3_v*"),
+                 eventSetupPathsKey = cms.string(''),
+                 andOr = cms.bool(True),
+                 throw = cms.bool(False)
+)
+
 process.hiz = cms.EDAnalyzer('HiZAnalyzer',
                                 srcMuon = cms.InputTag("patMuonsWithTrigger"),
                                 srcMuonNoTrig = cms.InputTag("patMuonsWithoutTrigger"),
                                 src = cms.InputTag("onia2MuMuPatTrkTrk"),
                                 genParticles = cms.InputTag("generator"),
                                 primaryVertexTag = cms.InputTag("offlinePrimaryVertices"),
+				srcCentrality = cms.InputTag("pACentrality"),
 
                                 #-- Reco Details
                                 useBeamSpot = cms.bool(False),
@@ -86,4 +96,5 @@ process.hiz = cms.EDAnalyzer('HiZAnalyzer',
                                 NumberOfTriggers = cms.uint32(7),
                                 )
 
+#process.p = cms.Path(process.hltMult100DblMu3 * process.hiz)
 process.p = cms.Path(process.hiz)
